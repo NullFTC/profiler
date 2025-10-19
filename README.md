@@ -17,7 +17,7 @@ This tool helps you identify which parts of your robot code are consuming the mo
 Profiler profiler = Profiler.builder()
     .factory(new BasicProfilerEntryFactory())
     .exporter(new CsvProfilerExporter(new File(AppUtils.APP_FOLDER + "/profiler.csv")))
-    .async(true)
+    .debugLog(false) // Logs *everything*
     .build();
 
 profiler.start("init");
