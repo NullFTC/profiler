@@ -4,13 +4,9 @@ plugins {
 	id("dev.frozenmilk.doc") version "0.0.4"
 }
 
-// TODO: modify
-android.namespace = "com.example.library"
+android.namespace = "dev.nullftc.profiler"
 
-// Most FTC libraries will want the following
 ftc {
-	kotlin // if you don't want to use kotlin, remove this
-
 	sdk {
 		RobotCore
 		FtcCommon {
@@ -20,16 +16,19 @@ ftc {
 }
 
 publishing {
+	repositories {
+		maven {
+			name = "nullftc"
+			url = uri("https://maven.nullftc.dev/releases")
+		}
+	}
 	publications {
 		register<MavenPublication>("release") {
-			// TODO: modify
-			groupId = "com.example"
-			// TODO: modify
-			artifactId = "Library"
+			groupId = "dev.nullftc"
+			artifactId = "Profiler"
 
 			artifact(dairyDoc.dokkaHtmlJar)
 			artifact(dairyDoc.dokkaJavadocJar)
-
 			afterEvaluate {
 				from(components["release"])
 			}

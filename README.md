@@ -1,44 +1,107 @@
-# Gradle Tasks
+# 🕒 Profiler
+*A lightweight, extensible profiling system for FTC codebases.*
 
-## Publishing
-This repository uses the dairy-publishing plugin.
+---
 
-This plugin makes it so that you cannot publish an unclean working tree.
-(no uncommited or untracked files). Attempts to publish will fail with a warning
-about this unclean state.
+## Overview
 
-If you make a copy of this repository, it will fail to sync until you have an
-initial commit due to "invalid HEAD state". I recommend making a pretty empty 
-initial commit of this template in order to sync, and then ammending it before 
-you push anywhere.
+**Profiler** is a lightweight, thread-safe profiling framework designed for use in **FIRST Tech Challenge (FTC)** robotics applications. It lets you measure execution times for various parts of your code and export them to structured files like CSV for performance analysis.
 
-Publication versions are taken from the current commit tag. Or, if there isn't
-one, then the version will be `SNAPSHOT-<commit hash>` where `<commit hash>` is
-replaced with the short commit hash of the current commit.
+This tool helps you identify which parts of your robot code are consuming the most time, which can be crucial for optimizing OpMode loops, path planners, and control subsystems.
 
-Snapshot versions will be published to the dairy snapshots repository, tagged
-commits will be published to the dairy releases repository.
+---
 
-It is possible to easily modify the publication locations, but if you want to
-actually publish to the dairy repository, then reach out to get publication
-access.
+## ⚙️ Example Usage
 
-### `assemble`
-'Build's your library (compiles it).
+```java
+Profiler profiler = Profiler.builder()
+    .factory(new BasicProfilerEntryFactory())
+    .exporter(new CsvProfilerExporter(new File(AppUtils.APP_FOLDER + "/profiler.csv")))
+    .async(true)
+    .build();
 
-### `build`
-Assembles and tests your library.
+profiler.start("init");
+// ... initialization code
+profiler.end("init");
 
-### `test`
-Tests your library.
+profiler.start("read");
+// ... your main control loop
+profiler.end("read");
 
-### `displayVersion`
-Will print out the version that is determined from git.
+profiler.export();   // Writes asynchronously if async=true
+profiler.shutdown(); // Cleanly stops background threads
+```
 
-### `publishToMavenLocal`
-Publishes to your maven local repository, found at `~/.m2`.
+---
 
-This is good to test publication before you actually do publish.
+## 🧩 Architecture Overview
 
-### `publishReleasePublicationToDairyRepository`
-Publishes to the dairy maven repository (https://repo.dairy.foundation/).
+Profiler is built around a **modular architecture** with clean separation of responsibilities:
+
+| Component              | Responsibility                                                     |
+|------------------------|--------------------------------------------------------------------|
+| `ProfilerEntry`        | Abstract representation of a recorded event                        |
+| `ProfilerEntryFactory` | Creates entries (allows different subclasses for specialized data) |
+| `ProfilerExporter`     | Handles output logic                                               |
+| `Profiler`             | Manages timing, synchronization, and lifecycle                     |
+
+
+This structure allows you to add new entry types (e.g., subsystem-specific or multi-metric) or new exporters without touching the core code.
+
+---
+
+## 🧠 Extending the Profiler
+
+### Custom Entry Type
+
+```java
+public class MotorProfilerEntry extends ProfilerEntry {
+    private final double motorPower;
+
+    public MotorProfilerEntry(String type, long start, long end, double motorPower) {
+        super(type, start, end);
+        this.motorPower = motorPower;
+    }
+
+    @Override
+    public String[] toCSVRow() {
+        return new String[] {
+            getType(),
+            String.valueOf(getStartTime()),
+            String.valueOf(getEndTime()),
+            String.valueOf(getDeltaTime()),
+            String.valueOf(motorPower)
+        };
+    }
+}
+```
+
+### Custom Exporter
+
+```java
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.List;
+import java.io.File;
+
+public class JsonProfilerExporter implements ProfilerExporter {
+
+    private final File outputFile;
+    private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+
+    public JsonProfilerExporter(File outputFile) {
+        this.outputFile = outputFile;
+    }
+
+    @Override
+    public void export(List<ProfilerEntry> entries) {
+        try (FileWriter writer = new FileWriter(outputFile)) {
+            gson.toJson(entries, writer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
