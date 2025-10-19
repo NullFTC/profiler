@@ -1,7 +1,6 @@
 package dev.nullftc.profiler;
 
 import java.util.*;
-import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -13,17 +12,13 @@ public class Profiler {
 
     private final ProfilerEntryFactory factory;
     private final ProfilerExporter exporter;
-    private final boolean async;
     private final List<ProfilerEntry> entries = new ArrayList<>();
     private final Map<String, Long> activeTimers = new HashMap<>();
     private final Lock lock = new ReentrantLock();
-    private final ExecutorService executor;
 
-    private Profiler(ProfilerEntryFactory factory, ProfilerExporter exporter, boolean async) {
+    private Profiler(ProfilerEntryFactory factory, ProfilerExporter exporter) {
         this.factory = factory;
         this.exporter = exporter;
-        this.async = async;
-        this.executor = async ? Executors.newSingleThreadExecutor() : null;
     }
 
     public void start(String type) {
@@ -60,27 +55,17 @@ public class Profiler {
     }
 
     public void export() {
-        Runnable task = () -> {
-            List<ProfilerEntry> snapshot;
-            lock.lock();
-            try {
-                snapshot = new ArrayList<>(entries);
-            } finally {
-                lock.unlock();
-            }
-            exporter.export(snapshot);
-        };
-
-        if (async && executor != null)
-            executor.execute(task);
-        else
-            task.run();
+        List<ProfilerEntry> snapshot;
+        lock.lock();
+        try {
+            snapshot = new ArrayList<>(entries);
+        } finally {
+            lock.unlock();
+        }
+        exporter.export(snapshot);
     }
 
-    public void shutdown() {
-        if (executor != null)
-            executor.shutdown();
-    }
+    public void shutdown() {}
 
     public static Builder builder() {
         return new Builder();
@@ -89,7 +74,6 @@ public class Profiler {
     public static class Builder {
         private ProfilerEntryFactory factory;
         private ProfilerExporter exporter;
-        private boolean async = true;
 
         public Builder factory(ProfilerEntryFactory factory) {
             this.factory = factory;
@@ -101,18 +85,12 @@ public class Profiler {
             return this;
         }
 
-        public Builder async(boolean async) {
-            this.async = async;
-            return this;
-        }
-
         public Profiler build() {
             if (factory == null)
                 throw new IllegalStateException("ProfilerEntryFactory not set");
             if (exporter == null)
                 throw new IllegalStateException("ProfilerExporter not set");
-            return new Profiler(factory, exporter, async);
+            return new Profiler(factory, exporter);
         }
     }
 }
-
