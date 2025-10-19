@@ -18,7 +18,7 @@ ftc {
 publishing {
 	repositories {
 		maven {
-			name = "nullftc"
+			name = "nullftcReleases"
 			url = uri("https://maven.nullftc.dev/releases")
             credentials(PasswordCredentials::class)
 		}
