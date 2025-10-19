@@ -20,6 +20,7 @@ publishing {
 		maven {
 			name = "nullftc"
 			url = uri("https://maven.nullftc.dev/releases")
+            credentials(PasswordCredentials::class)
 		}
 	}
 	publications {
