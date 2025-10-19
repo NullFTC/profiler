@@ -1,8 +1,12 @@
 package dev.nullftc.profiler;
 
-import java.util.*;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import dev.nullftc.profiler.entry.ProfilerEntry;
 import dev.nullftc.profiler.entry.ProfilerEntryFactory;
@@ -12,60 +16,48 @@ public class Profiler {
 
     private final ProfilerEntryFactory factory;
     private final ProfilerExporter exporter;
-    private final List<ProfilerEntry> entries = new ArrayList<>();
-    private final Map<String, Long> activeTimers = new HashMap<>();
-    private final Lock lock = new ReentrantLock();
+    private final boolean debugLog;
+    private final Logger LOGGER = LoggerFactory.getLogger("FTCProfiler");
 
-    private Profiler(ProfilerEntryFactory factory, ProfilerExporter exporter) {
+    private final Map<String, Long> activeTimers = new HashMap<>();
+    private final List<ProfilerEntry> entries = new ArrayList<>();
+
+    private Profiler(ProfilerEntryFactory factory, ProfilerExporter exporter, boolean debugLog) {
         this.factory = factory;
         this.exporter = exporter;
+        this.debugLog = debugLog;
+
+        if (debugLog) LOGGER.info("Profiler initialized with factory={} exporter={}", factory.getClass().getSimpleName(), exporter.getClass().getSimpleName());
     }
 
     public void start(String type) {
-        lock.lock();
-        try {
-            activeTimers.put(type, System.currentTimeMillis());
-        } finally {
-            lock.unlock();
-        }
+        activeTimers.put(type, System.currentTimeMillis());
+        if (debugLog) LOGGER.info("Profiler start: {}", type);
     }
 
     public void end(String type) {
+        Long start = activeTimers.remove(type);
+        if (start == null) {
+            if (debugLog) LOGGER.warn("Profiler warning: end() called for '{}' with no start()", type);
+            return;
+        }
+
         long end = System.currentTimeMillis();
-        Long start;
+        ProfilerEntry entry = factory.create(type, start, end);
+        entries.add(entry);
 
-        lock.lock();
-        try {
-            start = activeTimers.remove(type);
-        } finally {
-            lock.unlock();
-        }
-
-        if (start != null) {
-            ProfilerEntry entry = factory.create(type, start, end);
-            lock.lock();
-            try {
-                entries.add(entry);
-            } finally {
-                lock.unlock();
-            }
-        } else {
-            System.err.println("Profiler warning: end() called for '" + type + "' with no start()");
-        }
+        if (debugLog) LOGGER.info("Profiler end: {} | Duration={}ms", type, entry.getDeltaTime());
     }
 
     public void export() {
-        List<ProfilerEntry> snapshot;
-        lock.lock();
-        try {
-            snapshot = new ArrayList<>(entries);
-        } finally {
-            lock.unlock();
-        }
-        exporter.export(snapshot);
+        if (debugLog) LOGGER.info("Profiler export started | {} entries to export", entries.size());
+        exporter.export(new ArrayList<>(entries));
+        if (debugLog) LOGGER.info("Profiler export complete | File exported by {}", exporter.getClass().getSimpleName());
     }
 
-    public void shutdown() {}
+    public void shutdown() {
+        if (debugLog) LOGGER.info("Profiler shutdown called");
+    }
 
     public static Builder builder() {
         return new Builder();
@@ -74,6 +66,7 @@ public class Profiler {
     public static class Builder {
         private ProfilerEntryFactory factory;
         private ProfilerExporter exporter;
+        private boolean debugLog = false;
 
         public Builder factory(ProfilerEntryFactory factory) {
             this.factory = factory;
@@ -85,12 +78,15 @@ public class Profiler {
             return this;
         }
 
+        public Builder debugLog(boolean debugLog) {
+            this.debugLog = debugLog;
+            return this;
+        }
+
         public Profiler build() {
-            if (factory == null)
-                throw new IllegalStateException("ProfilerEntryFactory not set");
-            if (exporter == null)
-                throw new IllegalStateException("ProfilerExporter not set");
-            return new Profiler(factory, exporter);
+            if (factory == null) throw new IllegalStateException("ProfilerEntryFactory not set");
+            if (exporter == null) throw new IllegalStateException("ProfilerExporter not set");
+            return new Profiler(factory, exporter, debugLog);
         }
     }
 }
