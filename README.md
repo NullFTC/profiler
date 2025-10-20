@@ -11,6 +11,29 @@ This tool helps you identify which parts of your robot code are consuming the mo
 
 ---
 
+## ⚡ Installation
+
+You can grab the latest version of Profiler from [our Maven repository](https://maven.nullftc.dev/#/releases/dev/nullftc/Profiler). To use it in your TeamCode project, make sure to add the repository to the `repositories` block in your `build.gradle`:
+
+```groovy
+repositories {
+    // ... other repositories ...
+    maven {
+        name "nullftcReleases"
+        url "https://maven.nullftc.dev/releases"
+    }
+}
+```
+
+Then, add Profiler as a dependency in your dependencies block:
+```
+implementation "dev.nullftc:Profiler:<LATEST_VERSION>"
+```
+
+> 💡 Tip: Replace <LATEST_VERSION> with the version you want to use. Check the Maven page for the most up-to-date release.
+
+---
+
 ## ⚙️ Example Usage
 
 ```java
