@@ -14,22 +14,50 @@ This tool helps you identify which parts of your robot code are consuming the mo
 ## ⚙️ Example Usage
 
 ```java
-Profiler profiler = Profiler.builder()
-    .factory(new BasicProfilerEntryFactory())
-    .exporter(new CsvProfilerExporter(new File(AppUtils.APP_FOLDER + "/profiler.csv")))
-    .debugLog(false) // Logs *everything*
-    .build();
+import java.io.File;
 
-profiler.start("init");
-// ... initialization code
-profiler.end("init");
+@TeleOp(name = "Profiler Linear OpMode", group = "Test")
+public class ProfilerLinearOpMode extends LinearOpMode {
 
-profiler.start("read");
-// ... your main control loop
-profiler.end("read");
+    private Profiler profiler;
 
-profiler.export();   // Writes asynchronously if async=true
-profiler.shutdown(); // Cleanly stops background threads
+    @Override
+    public void runOpMode() throws InterruptedException {
+        File logsFolder = new File(AppUtil.FIRST_FOLDER, "logs");
+        if (!logsFolder.exists()) logsFolder.mkdirs();
+
+        long timestamp = System.currentTimeMillis();
+        File file = new File(logsFolder, "profiler-" + timestamp + ".csv");
+
+        profiler = Profiler.builder()
+                .factory(new BasicProfilerEntryFactory())
+                .exporter(new CSVProfilerExporter(file))
+                .debugLog(true)
+                .build();
+
+        try {
+            profiler.start("Init");
+            // ... initialization logic ...
+            profiler.end("Init");
+
+            telemetry.addData("Status", "Waiting for start");
+            telemetry.update();
+
+            waitForStart();
+
+            while (opModeIsActive() && !isStopRequested()) {
+                profiler.start("Loop");
+                // ... your main loop logic ...
+                telemetry.update();
+                profiler.end("Loop");
+            }
+        } finally {
+            profiler.export();
+            profiler.shutdown();
+            telemetry.update();
+        }
+    }
+}
 ```
 
 ---
@@ -105,3 +133,7 @@ public class JsonProfilerExporter implements ProfilerExporter {
     }
 }
 ```
+
+📊 Using the Exported Data
+
+Once Profiler has exported your data to a CSV, you can use our pre-built visualization to figure out what is taking up the most time in your loops! Hope you find this useful :)
