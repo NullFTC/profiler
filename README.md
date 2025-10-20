@@ -157,6 +157,10 @@ public class JsonProfilerExporter implements ProfilerExporter {
 }
 ```
 
-📊 Using the Exported Data
+---
 
-Once Profiler has exported your data to a CSV, you can use our pre-built visualization to figure out what is taking up the most time in your loops! Hope you find this useful :)
+## 📊 Using the Exported Data
+
+Once Profiler has exported your data to a CSV, you can use our pre-built visualization to see exactly what’s taking up the most time in your loops!  
+
+Check it out here: [Profiler Visualizer](https://insights.nullftc.dev/) – it makes spotting bottlenecks super easy. Hope you find it useful! 🙂
