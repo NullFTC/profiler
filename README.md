@@ -37,7 +37,17 @@ implementation "dev.nullftc:Profiler:<LATEST_VERSION>"
 ## ⚙️ Example Usage
 
 ```java
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.util.RobotLog;
+
+import org.firstinspires.ftc.robotcore.internal.system.AppUtil;
+
 import java.io.File;
+
+import dev.nullftc.profiler.Profiler;
+import dev.nullftc.profiler.entry.BasicProfilerEntryFactory;
+import dev.nullftc.profiler.exporter.CSVProfilerExporter;
 
 @TeleOp(name = "Profiler Linear OpMode", group = "Test")
 public class ProfilerLinearOpMode extends LinearOpMode {
@@ -75,10 +85,29 @@ public class ProfilerLinearOpMode extends LinearOpMode {
                 profiler.end("Loop");
             }
         } finally {
-            profiler.export();
-            profiler.shutdown();
+            exportProfiler(file);
             telemetry.update();
         }
+    }
+
+    /**
+    * Exporting is computationally expensive, and has been optimized to the best it can be,
+    * but to be safe we create a new thread to export on as to not have the program be stuck in stop()
+    */
+    private void exportProfiler(File file) {
+        RobotLog.i("Starting async profiler export to: " + file.getAbsolutePath());
+
+        Thread exportThread = new Thread(() -> {
+            try {
+                profiler.export();
+                profiler.shutdown();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+
+        exportThread.setDaemon(true);
+        exportThread.start();
     }
 }
 ```
