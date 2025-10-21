@@ -17,7 +17,7 @@ public class Profiler {
     private final ProfilerEntryFactory factory;
     private final ProfilerExporter exporter;
     private final boolean debugLog;
-    private final Logger LOGGER = LoggerFactory.getLogger("FTCProfiler");
+    public static final Logger LOGGER = LoggerFactory.getLogger("FTCProfiler");
 
     private final Map<String, Long> activeTimers = new HashMap<>();
     private final List<ProfilerEntry> entries = new ArrayList<>();
