@@ -6,9 +6,15 @@ import dev.nullftc.profiler.exporter.JsonTraceExporter;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class FtcProfiler {
+    private static final Set<FtcProfilerSession> ACTIVE_SESSIONS = Collections.synchronizedSet(new LinkedHashSet<FtcProfilerSession>());
+
     private final Object owner;
     private final File outputFile;
     private boolean deepScan;
@@ -46,7 +52,9 @@ public final class FtcProfiler {
             session.diagnostic("reflection_warning", warning, null);
         }
 
-        return new FtcProfilerSession(session, outputFile);
+        FtcProfilerSession profilerSession = new FtcProfilerSession(session, outputFile);
+        ACTIVE_SESSIONS.add(profilerSession);
+        return profilerSession;
     }
 
     private static File defaultOutputFile() {
@@ -54,9 +62,22 @@ public final class FtcProfiler {
         return new File(root, "trace-" + System.currentTimeMillis() + ".json");
     }
 
+    static void exportActiveSessionsAsync() {
+        FtcProfilerSession[] sessions;
+        synchronized (ACTIVE_SESSIONS) {
+            sessions = ACTIVE_SESSIONS.toArray(new FtcProfilerSession[0]);
+        }
+
+        for (FtcProfilerSession session : sessions) {
+            session.exportAsync();
+        }
+    }
+
     public static final class FtcProfilerSession implements AutoCloseable {
         private final ProfilerSession session;
         private final File outputFile;
+        private final AtomicBoolean exportStarted = new AtomicBoolean(false);
+        private final AtomicBoolean closed = new AtomicBoolean(false);
 
         private FtcProfilerSession(ProfilerSession session, File outputFile) {
             this.session = session;
@@ -78,13 +99,47 @@ public final class FtcProfiler {
         }
 
         public void export() throws IOException {
-            new JsonTraceExporter(outputFile.toPath()).export(session.snapshot());
+            if (!exportStarted.compareAndSet(false, true)) {
+                return;
+            }
+            try {
+                closeSession();
+                new JsonTraceExporter(outputFile.toPath()).export(session.snapshot());
+            } finally {
+                ACTIVE_SESSIONS.remove(this);
+            }
+        }
+
+        public void exportAsync() {
+            if (!exportStarted.compareAndSet(false, true)) {
+                return;
+            }
+
+            Thread exportThread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        closeSession();
+                        new JsonTraceExporter(outputFile.toPath()).export(session.snapshot());
+                    } catch (IOException exception) {
+                        session.diagnostic("export_failed", exception.getMessage(), null);
+                    } finally {
+                        ACTIVE_SESSIONS.remove(FtcProfilerSession.this);
+                    }
+                }
+            }, "ftc-profiler-export");
+            exportThread.start();
         }
 
         @Override
         public void close() throws IOException {
-            session.close();
             export();
+        }
+
+        private void closeSession() {
+            if (closed.compareAndSet(false, true)) {
+                session.close();
+            }
         }
     }
 }

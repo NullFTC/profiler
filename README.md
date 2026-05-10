@@ -42,6 +42,8 @@ By default, FTC traces write to:
 /sdcard/FIRST/profiler
 ```
 
+When the OpMode stops, active V2 profiler sessions export on a background thread through an FTC `OpModeRegistrar` hook. You can still call `close()` yourself if you want to export earlier.
+
 ## Legacy API
 
 The old API still exists in `profiler-ftc` for now.
