@@ -1,38 +1,11 @@
 plugins {
-	id("dev.frozenmilk.android-library") version "10.1.1-0.1.3"
-	id("dev.frozenmilk.publish") version "0.0.4"
-	id("dev.frozenmilk.doc") version "0.0.4"
+	id("dev.frozenmilk.android-library") version "10.1.1-0.1.3" apply false
+	id("dev.frozenmilk.publish") version "0.0.4" apply false
+	id("dev.frozenmilk.doc") version "0.0.4" apply false
+	id("org.openjfx.javafxplugin") version "0.1.0" apply false
 }
 
-android.namespace = "dev.nullftc.profiler"
-
-ftc {
-	sdk {
-		RobotCore
-		FtcCommon {
-			configurationNames += "testImplementation"
-		}
-	}
-}
-
-publishing {
-	repositories {
-		maven {
-			name = "nullftcReleases"
-			url = uri("https://maven.nullftc.dev/releases")
-            credentials(PasswordCredentials::class)
-		}
-	}
-	publications {
-		register<MavenPublication>("release") {
-			groupId = "dev.nullftc"
-			artifactId = "Profiler"
-
-			artifact(dairyDoc.dokkaHtmlJar)
-			artifact(dairyDoc.dokkaJavadocJar)
-			afterEvaluate {
-				from(components["release"])
-			}
-		}
-	}
+allprojects {
+	group = "dev.nullftc"
+	version = "0.2.0-SNAPSHOT"
 }

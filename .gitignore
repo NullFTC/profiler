@@ -12,6 +12,7 @@
 # Java/JDK files
 *.class
 *.hprof
+test/
 
 # Generated files
 bin/

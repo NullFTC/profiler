@@ -1,195 +1,98 @@
-# 🕒 Profiler
-*A lightweight, extensible profiling system for FTC codebases.*
+![Profiler header](docs/assets/header.png)
 
----
+# Profiler
 
-## Overview
+Profiler is a WIP rewrite of the old FTC profiler. The goal is pretty simple: record what your robot code is spending time on, pull the trace off the robot, and make it easier to see what is making the loop slow.
 
-**Profiler** is a lightweight, thread-safe profiling framework designed for use in **FIRST Tech Challenge (FTC)** robotics applications. It lets you measure execution times for various parts of your code and export them to structured files like CSV for performance analysis.
+V2 is not stable yet. The API, trace format, and viewer are all still being worked on.
 
-This tool helps you identify which parts of your robot code are consuming the most time, which can be crucial for optimizing OpMode loops, path planners, and control subsystems.
+## Modules
 
----
+- `profiler-core`: trace model, span API, import/export, aggregation, and analyzer rules. No FTC SDK dependency.
+- `profiler-ftc`: FTC/Android integration, default robot export path, reflection target discovery, and the legacy API adapter.
+- `profiler-viewer`: strict WIP JavaFX viewer for opening local traces or pulling traces from a robot over ADB.
 
-## ⚡ Installation
+## V2 Runtime Usage
 
-You can grab the latest version of Profiler from [our Maven repository](https://maven.nullftc.dev/#/releases/dev/nullftc/Profiler). To use it in your TeamCode project, make sure to add the repository to the `repositories` block in your `build.gradle`:
-
-```groovy
-repositories {
-    // ... other repositories ...
-    maven {
-        name "nullftcReleases"
-        url "https://maven.nullftc.dev/releases"
-    }
-}
-```
-
-Then, add Profiler as a dependency in your dependencies block:
-```
-implementation "dev.nullftc:Profiler:<LATEST_VERSION>"
-```
-
-> 💡 Tip: Replace <LATEST_VERSION> with the version you want to use. Check the Maven page for the most up-to-date release.
-
----
-
-## ⚙️ Example Usage
+This is the new direction, but treat it as WIP.
 
 ```java
-import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.robotcore.util.RobotLog;
+import dev.nullftc.profiler.Profiled;
+import dev.nullftc.profiler.ftc.FtcProfiler;
+import dev.nullftc.profiler.ftc.FtcProfiler.FtcProfilerSession;
 
-import org.firstinspires.ftc.robotcore.internal.system.AppUtil;
-
-import java.io.File;
-
-import dev.nullftc.profiler.Profiler;
-import dev.nullftc.profiler.entry.BasicProfilerEntryFactory;
-import dev.nullftc.profiler.exporter.CSVProfilerExporter;
-
-@TeleOp(name = "Profiler Linear OpMode", group = "Test")
-public class ProfilerLinearOpMode extends LinearOpMode {
-
-    private Profiler profiler;
-
-    @Override
-    public void runOpMode() throws InterruptedException {
-        File logsFolder = new File(AppUtil.FIRST_FOLDER, "logs");
-        if (!logsFolder.exists()) logsFolder.mkdirs();
-
-        long timestamp = System.currentTimeMillis();
-        File file = new File(logsFolder, "profiler-" + timestamp + ".csv");
-
-        profiler = Profiler.builder()
-                .factory(new BasicProfilerEntryFactory())
-                .exporter(new CSVProfilerExporter(file))
-                .debugLog(true)
-                .build();
-
-        try {
-            profiler.start("Init");
-            // ... initialization logic ...
-            profiler.end("Init");
-
-            telemetry.addData("Status", "Waiting for start");
-            telemetry.update();
-
-            waitForStart();
-
-            while (opModeIsActive() && !isStopRequested()) {
-                profiler.start("Loop");
-                // ... your main loop logic ...
-                telemetry.update();
-                profiler.end("Loop");
-            }
-        } finally {
-            exportProfiler(file);
-            telemetry.update();
-        }
+public class RobotContainer {
+    @Profiled
+    public void update() {
+        // subsystem and scheduler work
     }
+}
 
-    /**
-    * Exporting is computationally expensive, and has been optimized to the best it can be,
-    * but to be safe we create a new thread to export on as to not have the program be stuck in stop()
-    */
-    private void exportProfiler(File file) {
-        RobotLog.i("Starting async profiler export to: " + file.getAbsolutePath());
-
-        Thread exportThread = new Thread(() -> {
-            try {
-                profiler.export();
-                profiler.shutdown();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
-
-        exportThread.setDaemon(true);
-        exportThread.start();
-    }
+// In an OpMode or helper:
+try (FtcProfilerSession profiler = FtcProfiler.auto(this).deepScan(true).start()) {
+    profiler.time("loop.robotUpdate", robot::update);
 }
 ```
 
----
+Reflection only finds targets. It does not magically time every method call. Timings come from `time(...)`, spans, or wrapper code.
 
-## 🧩 Architecture Overview
+By default, FTC traces write to:
 
-Profiler is built around a **modular architecture** with clean separation of responsibilities:
+```text
+/sdcard/FIRST/profiler
+```
 
-| Component              | Responsibility                                                     |
-|------------------------|--------------------------------------------------------------------|
-| `ProfilerEntry`        | Abstract representation of a recorded event                        |
-| `ProfilerEntryFactory` | Creates entries (allows different subclasses for specialized data) |
-| `ProfilerExporter`     | Handles output logic                                               |
-| `Profiler`             | Manages timing, synchronization, and lifecycle                     |
+## Legacy API
 
-
-This structure allows you to add new entry types (e.g., subsystem-specific or multi-metric) or new exporters without touching the core code.
-
----
-
-## 🧠 Extending the Profiler
-
-### Custom Entry Type
+The old API still exists in `profiler-ftc` for now.
 
 ```java
-public class MotorProfilerEntry extends ProfilerEntry {
-    private final double motorPower;
+Profiler profiler = Profiler.builder()
+        .factory(new BasicProfilerEntryFactory())
+        .exporter(new CSVProfilerExporter(file))
+        .build();
 
-    public MotorProfilerEntry(String type, long start, long end, double motorPower) {
-        super(type, start, end);
-        this.motorPower = motorPower;
-    }
-
-    @Override
-    public String[] toCSVRow() {
-        return new String[] {
-            getType(),
-            String.valueOf(getStartTime()),
-            String.valueOf(getEndTime()),
-            String.valueOf(getDeltaTime()),
-            String.valueOf(motorPower)
-        };
-    }
-}
+profiler.start("Loop");
+profiler.end("Loop");
+profiler.export();
 ```
 
-### Custom Exporter
+New code should use `ProfilerSession` or `FtcProfiler`, but the legacy path is still there while V2 settles.
 
-```java
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.List;
-import java.io.File;
+## Offline Analysis
 
-public class JsonProfilerExporter implements ProfilerExporter {
+Strict WIP. The viewer exists, but it is not polished yet.
 
-    private final File outputFile;
-    private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+Run it:
 
-    public JsonProfilerExporter(File outputFile) {
-        this.outputFile = outputFile;
-    }
-
-    @Override
-    public void export(List<ProfilerEntry> entries) {
-        try (FileWriter writer = new FileWriter(outputFile)) {
-            gson.toJson(entries, writer);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-}
+```bash
+./gradlew :profiler-viewer:run
 ```
 
----
+Local trace:
 
-## 📊 Using the Exported Data
+1. Click `Open Trace`.
+2. Pick a JSON or CSV trace.
 
-Once Profiler has exported your data to a CSV, you can use our pre-built visualization to see exactly what’s taking up the most time in your loops!  
+Robot trace over ADB:
 
-Check it out here: [Profiler Visualizer](https://insights.nullftc.dev/) – it makes spotting bottlenecks super easy. Hope you find it useful! 🙂
+1. Connect to the Control Hub over ADB Wi-Fi or USB.
+2. Click `Refresh Device`.
+3. Pick a file from `/sdcard/FIRST/profiler`.
+4. Click `Analyze Selected`.
+
+The viewer pulls the file into `~/.ftc-profiler/traces`, then shows aggregate timings and analyzer findings.
+
+## Viewer Release Candidate
+
+Build the viewer zip:
+
+```bash
+./gradlew :profiler-viewer:viewerCi
+```
+
+Output:
+
+```text
+profiler-viewer/build/release-candidates/ftc-profiler-viewer-0.2.0-SNAPSHOT-rc.zip
+```

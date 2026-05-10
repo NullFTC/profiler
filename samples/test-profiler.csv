@@ -1,0 +1,11 @@
+Id,Parent Id,Name,Start Nanos,End Nanos,Duration Nanos,Thread,Tags
+1,0,OpMode.init,0,8000000,8000000,main,{phase=init}
+2,0,OpMode.loop,10000000,33500000,23500000,main,{phase=loop}
+3,2,Drive.update,11000000,26500000,15500000,main,{subsystem=drive}
+4,3,Localizer.update,12000000,20500000,8500000,main,{subsystem=drive}
+5,2,Telemetry.update,27000000,33000000,6000000,main,{subsystem=telemetry}
+6,0,OpMode.loop,40000000,57500000,17500000,main,{phase=loop}
+7,6,Drive.update,41000000,50000000,9000000,main,{subsystem=drive}
+8,6,Scheduler.run,50500000,56000000,5500000,main,{subsystem=scheduler}
+9,0,OpMode.loop,60000000,83500000,23500000,main,{phase=loop}
+10,9,Vision.pipeline,61000000,80000000,19000000,vision,{subsystem=vision}
